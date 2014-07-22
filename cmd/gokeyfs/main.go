@@ -276,10 +276,10 @@ func (k *KeyFs) Walk(req *srv.Req) {
 	if err != nil && nqids == 0 {
 		req.RespondError(err)
 		return
-	} else {
-		req.RespondRwalk(wqids[0:nqids])
-		return
 	}
+
+	req.RespondRwalk(wqids[0:nqids])
+	return
 }
 
 func (k *KeyFs) Open(req *srv.Req) {

@@ -79,9 +79,9 @@ func (a *authcli) serve() {
 		a.terr(err)
 		glog.Error(err)
 		return
-	} else {
-		a.p9 = p9
 	}
+
+	a.p9 = p9
 
 	defer a.p9.Unmount()
 

@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	// Types of messages the auth server may encounter
 	AuthTreq   = 1  /* ticket request */
 	AuthChal   = 2  /* challenge box request */
 	AuthPass   = 3  /* change password */
@@ -44,6 +45,7 @@ func btos(b []byte) string {
 	return string(b[:])
 }
 
+// A TicketReq is a request for a ticket received by the auth server.
 type TicketReq struct {
 	Type    uint8
 	AuthID  [ANAMELEN]byte
@@ -64,6 +66,7 @@ func (t TicketReq) String() string {
 		" uid " + btos(t.UID[:])
 }
 
+// A Ticket is an encrypted ticket sent by the auth server to the client.
 type Ticket struct {
 	Num  uint8
 	Chal [CHALLEN]byte
