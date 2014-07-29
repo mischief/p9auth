@@ -15,11 +15,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"database/sql"
-	"github.com/coopernurse/gorp"
-	_ "github.com/mattn/go-sqlite3"
+	"upper.io/db"
 )
 
+// Dirgen is a helper for dirread9p.
 type Dirgen func(uint64, interface{}) *p.Dir
 
 func dirread9p(req *srv.Req, gen Dirgen, i interface{}) {
@@ -58,6 +57,7 @@ func dirread9p(req *srv.Req, gen Dirgen, i interface{}) {
 }
 
 const (
+	// Qroot and others are file QIDs
 	Qroot = iota
 	Quser
 	Qkey
@@ -110,8 +110,9 @@ var (
 		Qwarnings: "warnings",
 	}
 
-	flagl  = flag.String("l", ":61509", "listen address")
-	flagdb = flag.String("db", "", "database file")
+	flagl      = flag.String("l", ":61509", "listen address")
+	flagdbtype = flag.String("dbtype", sqladapters[0], "database type")
+	flagdbfile = flag.String("db", "keyfs.db", "database file")
 )
 
 func fsmkqid(level, id uint64) *p.Qid {
@@ -140,7 +141,7 @@ type KeyFid struct {
 
 type KeyFs struct {
 	srv.Srv
-	dbm *gorp.DbMap
+	db *keydb
 
 	quit chan struct{}
 }
@@ -217,11 +218,12 @@ func (k *KeyFs) Walk1(fid *srv.Fid, name string, qid *p.Qid) (err error) {
 			}
 
 			if i == Quser {
-				var u User
-				if err := k.dbm.SelectOne(&u, "select * from users where username=? limit 1", name); err != nil {
+				u, err := k.db.ByUsername(name)
+				if err != nil {
 					glog.Error(err)
 					return err
 				}
+
 				id = u.Uid
 				break loop
 			}
@@ -315,8 +317,9 @@ func (k *KeyFs) Read(req *srv.Req) {
 		if off >= Qmax {
 			return nil
 		}
-		var u User
-		if err := k.dbm.SelectOne(&u, "select * from users where uid=? limit 1", fid.uid); err != nil {
+
+		u, err := k.db.ByUid(fid.uid)
+		if err != nil {
 			glog.Error(err)
 			return nil
 		}
@@ -330,7 +333,9 @@ func (k *KeyFs) Read(req *srv.Req) {
 	case Qroot:
 		// select bla bla
 		var users []User
-		if _, err := k.dbm.Select(&users, "select * from users order by id"); err != nil {
+		users, err := k.db.All()
+		if err != nil {
+			glog.Error(err)
 			req.RespondError(err)
 			return
 		}
@@ -341,8 +346,8 @@ func (k *KeyFs) Read(req *srv.Req) {
 		return
 	case Qkey:
 		if tc.Offset == 0 {
-			var u User
-			if err := k.dbm.SelectOne(&u, "select * from users where uid=? limit 1", fid.uid); err != nil {
+			u, err := k.db.ByUid(fid.uid)
+			if err != nil {
 				glog.Error(err)
 				req.RespondError(err)
 				return
@@ -355,8 +360,8 @@ func (k *KeyFs) Read(req *srv.Req) {
 		return
 	case Qsecret:
 		if tc.Offset == 0 {
-			var u User
-			if err := k.dbm.SelectOne(&u, "select * from users where uid=? limit 1", fid.uid); err != nil {
+			u, err := k.db.ByUid(fid.uid)
+			if err != nil {
 				glog.Error(err)
 				req.RespondError(err)
 				return
@@ -412,21 +417,21 @@ func (k *KeyFs) Remove(req *srv.Req) {
 }
 
 func (k *KeyFs) Stat(req *srv.Req) {
-	var u User
-
 	fid := req.Fid.Aux.(*KeyFid)
 
 	if fid.uid != 0 {
-		if err := k.dbm.SelectOne(&u, "select * from users where uid=? limit 1", fid.uid); err != nil {
+		u, err := k.db.ByUid(fid.uid)
+		if err != nil {
 			glog.Error(err)
 			req.RespondError(err)
 			return
 		}
+
+		p := k.fsmkdir(fid.qtype, uint64(fid.uid), u.Username)
+		req.RespondRstat(p)
 	}
 
-	p := k.fsmkdir(fid.qtype, uint64(fid.uid), u.Username)
-
-	req.RespondRstat(p)
+	req.RespondError(fmt.Errorf("bad uid"))
 }
 
 func (k *KeyFs) Wstat(req *srv.Req) {
@@ -467,49 +472,17 @@ func (k *KeyFs) Run() error {
 	return nil
 }
 
-type gorplog struct {
-}
-
-func (gorplog) Printf(format string, v ...interface{}) {
-	glog.Infof(format, v...)
-}
-
-type User struct {
-	Dbid     int    `db:"id"`
-	Uid      int    `db:"uid"`
-	Username string `db:"username"`
-	//Deskey   string `db:"deskey"`
-	Password string `db:"password"`
-}
-
-func db(dbname string) (*gorp.DbMap, error) {
-	db, err := sql.Open("sqlite3", dbname)
-	if err != nil {
-		return nil, err
-	}
-
-	dbm := &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
-
-	dbm.TraceOn("[gorp]", gorplog{})
-
-	dbm.AddTableWithName(User{}, "users").SetKeys(true, "Dbid")
-	if err := dbm.CreateTablesIfNotExists(); err != nil {
-		return nil, err
-	}
-	return dbm, nil
-}
-
 func main() {
 	flag.Parse()
-	dbm, err := db(*flagdb)
+	db, err := keydbopen(*flagdbtype, db.Settings{Database: *flagdbfile})
 	if err != nil {
 		glog.Errorf("db: %s", err)
 		return
 	}
-	defer dbm.Db.Close()
+	defer db.dbm.Close()
 
 	keyfs := &KeyFs{
-		dbm:  dbm,
+		db:   db,
 		quit: make(chan struct{}, 1),
 	}
 

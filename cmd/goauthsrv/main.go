@@ -99,7 +99,7 @@ func (a *authcli) serve() {
 	case p9auth.AuthTreq:
 		a.ticketrequest(tr)
 	default:
-		glog.Error("unhandled Ticketreq %d", tr.Type)
+		glog.Errorf("unhandled Ticketreq %d", tr.Type)
 	}
 }
 
