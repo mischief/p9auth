@@ -56,7 +56,7 @@ func (*keyfsdb) Key(user string) (key [p9auth.DESKEYLEN]byte, err error) {
 func main() {
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "authsrv", log.LstdFlags|log.Lshortfile)
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
 	listener, err := net.Listen("tcp", *listenaddr)
 	if err != nil {
 		logger.Fatal(err)
