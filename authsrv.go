@@ -113,7 +113,7 @@ fail:
 // helper for writing errors
 func aerr(c net.Conn, err error) {
 	c.Write([]byte{AuthErr})
-	fmt.Fprintf(c, "%64.64s", err)
+	fmt.Fprintf(c, "%-64.64s", err)
 }
 
 // helper to make deskey
