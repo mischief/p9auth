@@ -10,7 +10,7 @@ import (
 )
 
 type AuthDb interface {
-	Key(user string) ([DESKEYLEN]byte, error)
+	Key(user, dom string) ([DESKEYLEN]byte, error)
 }
 
 type AuthSrv struct {
@@ -68,11 +68,11 @@ func (a *AuthSrv) ticketrequest(con net.Conn, tr *TicketReq) {
 	var err error
 	var t Ticket
 
-	if akey, err = a.db.Key(btos(tr.AuthID[:])); err != nil {
+	if akey, err = a.db.Key(btos(tr.AuthID[:]), btos(tr.AuthDom[:])); err != nil {
 		goto fail
 	}
 
-	if hkey, err = a.db.Key(btos(tr.HostID[:])); err != nil {
+	if hkey, err = a.db.Key(btos(tr.HostID[:]), btos(tr.AuthDom[:])); err != nil {
 		goto fail
 	}
 

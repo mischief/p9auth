@@ -1,3 +1,6 @@
+// Goetcdauth implements a Plan 9 auth server that serves data from etcd.
+// It is also capable of serving multiple authentication domains as presented
+// by the authdom in p9sk1 tickets.
 package main
 
 import (
@@ -34,12 +37,12 @@ func init() {
 type keyfsdb struct {
 }
 
-func (*keyfsdb) Key(user string) (key [p9auth.DESKEYLEN]byte, err error) {
+func (*keyfsdb) Key(user, dom string) (key [p9auth.DESKEYLEN]byte, err error) {
 
 	machines := strings.Split(machine, ",")
 	cl := etcd.NewClient(machines)
 
-	r, err := cl.Get(fmt.Sprintf("/authsrv/%s/key", user), false, false)
+	r, err := cl.Get(fmt.Sprintf("/authsrv/%s/%s/key", dom, user), false, false)
 	if err != nil {
 		return key, err
 	}

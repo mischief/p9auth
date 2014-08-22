@@ -1,3 +1,6 @@
+// Goauthsrv implements a Plan 9 authentication server that can speak a little
+// bit of p9sk1. It requires that keyfs is accessible over tcp, but it should
+// be able to open plain files (if keyfs is mounted) in the future.
 package main
 
 import (
@@ -30,7 +33,7 @@ var (
 type keyfsdb struct {
 }
 
-func (*keyfsdb) Key(user string) (key [p9auth.DESKEYLEN]byte, err error) {
+func (*keyfsdb) Key(user, dom string) (key [p9auth.DESKEYLEN]byte, err error) {
 	p9, err := clnt.Mount("tcp", *keyaddr, "", &myuser)
 	if err != nil {
 		return
