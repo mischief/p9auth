@@ -68,11 +68,17 @@ func (a *AuthSrv) ticketrequest(con net.Conn, tr *TicketReq) {
 	var err error
 	var t Ticket
 
-	if akey, err = a.db.Key(btos(tr.AuthID[:]), btos(tr.AuthDom[:])); err != nil {
+	said := btos(tr.AuthID[:])
+	sdom := btos(tr.AuthDom[:])
+	shid := btos(tr.HostID[:])
+
+	if akey, err = a.db.Key(said, sdom); err != nil {
+		a.log.Printf("tr-fail dom %s authid %s", sdom, said)
 		goto fail
 	}
 
-	if hkey, err = a.db.Key(btos(tr.HostID[:]), btos(tr.AuthDom[:])); err != nil {
+	if hkey, err = a.db.Key(shid, sdom); err != nil {
+		a.log.Printf("tr-fail dom %s hostid %s", sdom, shid)
 		goto fail
 	}
 
@@ -93,6 +99,8 @@ func (a *AuthSrv) ticketrequest(con net.Conn, tr *TicketReq) {
 	t.Num = AuthTs
 	m = t.ToM(akey[:])
 	con.Write(m)
+
+	a.log.Printf("tr-ok dom %s %s@%s -> %s@%s", sdom, btos(tr.UID[:]), shid, btos(tr.UID[:]), said)
 
 	return
 
